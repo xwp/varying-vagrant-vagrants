@@ -241,6 +241,22 @@ then
 	fi
 fi
 
+# WATCHR PLAYGROUND
+#
+#
+# This installs watchr fine (I think).. the full path is required to use gem at this point
+/opt/vagrant_ruby/bin/gem install watchr | echo "Install watchr to monitor config files..."
+
+# Can't do this because the pipe at now generates a syntax error
+# watchr /srv/config/watchr.script >/dev/null 2>&1 & | at now
+
+# This starts watchr as expected, but watched files do not generate the scripts. I've tried variations
+# of this up and down without success.
+su -c "cd /srv/config; /opt/vagrant_ruby/bin/watchr watchr.script > /dev/null 2>&1 &" -s /bin/sh vagrant
+
+# If after booting, I kill the process created by the above and do the same thing logged
+# into shell as vagrant, it works fine.......
+
 # Your host IP is set in Vagrantfile, but it's nice to see the interfaces anyway.
 # Enter domains space delimited
 DOMAINS='local.wordpress.dev local.wordpress-trunk.dev'
