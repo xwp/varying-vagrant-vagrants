@@ -20,10 +20,6 @@ then
 	ping_result=`ping -c 2 4.2.2.2 2>&1`
 fi
 
-# Capture the current IP address of the virtual machine into a variable that
-# can be used when necessary throughout provisioning.
-vvv_ip=`ifconfig eth1 | ack "inet addr" | cut -d ":" -f 2 | cut -d " " -f 1`
-
 # PACKAGE INSTALLATION
 #
 # Build a bash array to pass all of the packages we want to install to a single
@@ -100,7 +96,7 @@ do
 		space_count=`expr 20 - "${#pkg}"` #11
 		pack_space_count=`expr 30 - "${#package_version}"`
 		real_space=`expr ${space_count} + ${pack_space_count} + ${#package_version}`
-		printf " * $pkg %${real_space}.${#package_version}s" $package_version
+		printf " * $pkg %${real_space}.${#package_version}s ${package_version}\n"
 	else
 		echo " *" $pkg [not installed]
 		apt_package_install_list+=($pkg)
@@ -275,6 +271,10 @@ ln -sf /srv/config/bash_aliases /home/vagrant/.bash_aliases | echo " * /srv/conf
 
 # Custom vim configuration via .vimrc
 ln -sf /srv/config/vimrc /home/vagrant/.vimrc | echo " * /srv/config/vimrc -> /home/vagrant/.vimrc"
+
+# Capture the current IP address of the virtual machine into a variable that
+# can be used when necessary throughout provisioning.
+vvv_ip=`ifconfig eth1 | ack "inet addr" | cut -d ":" -f 2 | cut -d " " -f 1`
 
 # RESTART SERVICES
 #
