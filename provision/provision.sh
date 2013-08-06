@@ -427,7 +427,7 @@ if ! grep -q "$wp_domains" /etc/hosts
 then
 	echo "127.0.0.1 $wp_domains" >> /etc/hosts
 fi
-echo "$vagrant_ip $wp_domains" | tee -a /srv/config/host-hosts
+echo "$vvv_ip $wp_domains" | tee -a /srv/config/host-hosts
 
 # Look for additional domains defined in the sites
 for site_domains_file in $(find /srv/www -name 'vvv-domains')
@@ -438,7 +438,7 @@ do
 		then
 			echo "127.0.0.1 $site_domain_line" >> /etc/hosts
 		fi
-		echo "$vagrant_ip $site_domain_line" | tee -a /srv/config/host-hosts
+		echo "$vvv_ip $site_domain_line" | tee -a /srv/config/host-hosts
 	done
 done
 
