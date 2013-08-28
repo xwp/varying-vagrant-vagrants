@@ -56,7 +56,9 @@ if [ -e /usr/local/bin/wp ]; then
 	echo "Looking for vvv-data.sql files in WordPress projects within /srv/www..."
 	for vvv_data_sql in $(find /srv/www -name vvv-data.sql); do
 		cd $(dirname $vvv_data_sql)
-		if ! wp core is-installed >/dev/null 2>&1; then
+		output=$(wp core is-installed 2>&1)
+		exit_code=$?
+		if [ $exit_code != 0 ] || grep -s 'Error establishing a database connection' <<< $output; then
 			wp db import $vvv_data_sql
 		else
 			echo "Skipping since already installed: $vvv_data_sql"
