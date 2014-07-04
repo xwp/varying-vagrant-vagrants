@@ -57,7 +57,6 @@ apt_package_check_list=(
 	php5-curl
 	php-pear
 	php5-gd
-	php-apc
 
 	# nginx is installed as the default web server
 	nginx
@@ -202,7 +201,7 @@ if [[ $ping_result == *bytes?from* ]]; then
 		chmod +x composer.phar
 		mv composer.phar /usr/local/bin/composer
 
-		COMPOSER_HOME=/usr/local/src/composer composer -q global require --no-update phpunit/phpunit:3.7.*
+		COMPOSER_HOME=/usr/local/src/composer composer -q global require --no-update phpunit/phpunit:4.0.*
 		COMPOSER_HOME=/usr/local/src/composer composer -q global require --no-update phpunit/php-invoker:1.1.*
 		COMPOSER_HOME=/usr/local/src/composer composer -q global require --no-update mockery/mockery:0.8.*
 		COMPOSER_HOME=/usr/local/src/composer composer -q global require --no-update d11wtq/boris:v1.0.2
@@ -265,15 +264,17 @@ echo " * /srv/config/nginx-config/nginx-wp-common.conf -> /etc/nginx/nginx-wp-co
 echo " * /srv/config/nginx-config/sites/               -> /etc/nginx/custom-sites"
 
 # Copy php-fpm configuration from local
+cp /srv/config/php5-fpm-config/php5-fpm.conf /etc/php5/fpm/php5-fpm.conf
 cp /srv/config/php5-fpm-config/www.conf /etc/php5/fpm/pool.d/www.conf
 cp /srv/config/php5-fpm-config/php-custom.ini /etc/php5/fpm/conf.d/php-custom.ini
+cp /srv/config/php5-fpm-config/opcache.ini /etc/php5/fpm/conf.d/opcache.ini
 cp /srv/config/php5-fpm-config/xdebug.ini /etc/php5/fpm/conf.d/xdebug.ini
-cp /srv/config/php5-fpm-config/apc.ini /etc/php5/fpm/conf.d/apc.ini
 
+echo " * /srv/config/php5-fpm-config/php5-fpm.conf     -> /etc/php5/fpm/php5-fpm.conf"
 echo " * /srv/config/php5-fpm-config/www.conf          -> /etc/php5/fpm/pool.d/www.conf"
 echo " * /srv/config/php5-fpm-config/php-custom.ini    -> /etc/php5/fpm/conf.d/php-custom.ini"
+echo " * /srv/config/php5-fpm-config/opcache.ini       -> /etc/php5/fpm/conf.d/opcache.ini"
 echo " * /srv/config/php5-fpm-config/xdebug.ini        -> /etc/php5/fpm/conf.d/xdebug.ini"
-echo " * /srv/config/php5-fpm-config/apc.ini           -> /etc/php5/fpm/conf.d/apc.ini"
 
 # Copy memcached configuration from local
 cp /srv/config/memcached-config/memcached.conf /etc/memcached.conf
@@ -385,6 +386,18 @@ if [[ $ping_result == *bytes?from* ]]; then
 		echo "phpMemcachedAdmin already installed."
 	fi
 
+	# Checkout Opcache Status to provide a dashboard for viewing statistics
+	# about PHP's built in opcache.
+	if [[ ! -d /srv/www/default/opcache-status ]]; then
+		echo -e "\nDownloading Opcache Status, see https://github.com/rlerdorf/opcache-status/"
+		cd /srv/www/default
+		git clone https://github.com/rlerdorf/opcache-status.git opcache-status
+	else
+		echo -e "\nUpdating Opcache Status"
+		cd /srv/www/default/opcache-status
+		git pull --rebase origin master
+	fi
+
 	# Webgrind install (for viewing callgrind/cachegrind files produced by
 	# xdebug profiler)
 	if [[ ! -d /srv/www/default/webgrind ]]; then
@@ -401,9 +414,13 @@ if [[ $ping_result == *bytes?from* ]]; then
 		echo -e "\nDownloading PHP_CodeSniffer (phpcs), see https://github.com/squizlabs/PHP_CodeSniffer"
 		git clone git://github.com/squizlabs/PHP_CodeSniffer.git /srv/www/phpcs
 	else
-		echo -e "\nUpdating PHP_CodeSniffer (phpcs)..."
 		cd /srv/www/phpcs
-		git pull --rebase origin master
+		if [[ $(git rev-parse --abbrev-ref HEAD) == 'master' ]]; then
+			echo -e "\nUpdating PHP_CodeSniffer (phpcs)..."
+			git pull --no-edit origin master
+		else
+			echo -e "\nSkipped updating PHP_CodeSniffer since not on master branch"
+		fi
 	fi
 
 	# Sniffs WordPress Coding Standards
@@ -411,10 +428,15 @@ if [[ $ping_result == *bytes?from* ]]; then
 		echo -e "\nDownloading WordPress-Coding-Standards, snifs for PHP_CodeSniffer, see https://github.com/WordPress-Coding-Standards/WordPress-Coding-Standards"
 		git clone git://github.com/WordPress-Coding-Standards/WordPress-Coding-Standards.git /srv/www/phpcs/CodeSniffer/Standards/WordPress
 	else
-		echo -e "\nUpdating PHP_CodeSniffer..."
 		cd /srv/www/phpcs/CodeSniffer/Standards/WordPress
-		git pull --rebase origin master
+		if [[ $(git rev-parse --abbrev-ref HEAD) == 'master' ]]; then
+			echo -e "\nUpdating PHP_CodeSniffer WordPress Coding Standards..."
+			git pull --no-edit origin master
+		else
+			echo -e "\nSkipped updating PHPCS WordPress Coding Standards since not on master branch"
+		fi
 	fi
+	phpcs --config-set installed_paths CodeSniffer/Standards/WordPress/
 
 	# Install and configure the latest stable version of WordPress
 	if [[ ! -d /srv/www/wordpress-default ]]; then
@@ -474,7 +496,15 @@ PHP
 	else
 		echo "Updating WordPress develop..."
 		cd /srv/www/wordpress-develop/
-		svn up
+		if [[ -e .svn ]]; then
+			svn up
+		else
+			if [[ $(git rev-parse --abbrev-ref HEAD) == 'master' ]]; then
+				git pull --no-edit git://develop.git.wordpress.org/ master
+			else
+				echo "Skip auto git pull on develop.git.wordpress.org since not on master branch"
+			fi
+		fi
 		npm install &>/dev/null
 	fi
 
@@ -486,11 +516,11 @@ PHP
 
 	# Download phpMyAdmin
 	if [[ ! -d /srv/www/default/database-admin ]]; then
-		echo "Downloading phpMyAdmin 4.1.3..."
+		echo "Downloading phpMyAdmin 4.1.12..."
 		cd /srv/www/default
-		wget -q -O phpmyadmin.tar.gz 'http://sourceforge.net/projects/phpmyadmin/files/phpMyAdmin/4.1.3/phpMyAdmin-4.1.3-all-languages.tar.gz/download'
+		wget -q -O phpmyadmin.tar.gz 'http://sourceforge.net/projects/phpmyadmin/files/phpMyAdmin/4.1.12/phpMyAdmin-4.1.12-all-languages.tar.gz/download'
 		tar -xf phpmyadmin.tar.gz
-		mv phpMyAdmin-4.1.3-all-languages database-admin
+		mv phpMyAdmin-4.1.12-all-languages database-admin
 		rm phpmyadmin.tar.gz
 	else
 		echo "PHPMyAdmin already installed."
